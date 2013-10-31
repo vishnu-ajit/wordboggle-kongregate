@@ -22,32 +22,60 @@
 		private var currentFoundWord:MovieClip;
 		private var timeElapsed:Number=0;
 		private var timeRemaining:Number;
-		private var totalTimeAllotted:Number = 1 * 60 ;//2 minutes
+		private var totalTimeAllotted:Number = 3 * 60 ;//2 minutes
 		private var gameTimer:Timer = new Timer(1000,60);
 		private var tileAlphabets= new Array("A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z");
 		private var tileValues= new Array(1,3,3,2,1,4,2,4,1,8,5,1,3,1,1,3,10,1,1,1,1,4,4,8,4,10);	
 		public var gameScore:int = 0;
 		private var gameusedTilesArray:Array = new Array();
-		
+		private var addedWords:Array = new Array();
+		private var foundWordsAndTicksArray:Array = new Array();
+		private var correctWords:int = 0;
+		private var mcFoundWord:FoundWord;
+		private var foundWord:String="";
+		private var wrong:mcWrong;
 		public function Main() 
 		{
 			
 			
 			// constructor code
 		}
+		private function submitscoreclickListener(evt:MouseEvent)
+		{
+			
+			kongregate.scores.submit( gameScore );
+			unloadScene();
+			gotoAndPlay(1,"welcome");
+		}
 		
 		private function startGame()
 		{
-			
+			if(gameMode == "TIMED")
+			{
+				timeElapsed = 0;
+				gameTimer = new Timer(1000,180);
+				gameTimer.removeEventListener(TimerEvent.TIMER,gameTimerListener);
+				gameTimer.addEventListener(TimerEvent.TIMER,gameTimerListener);
+				gameTimer.start();
+				timeRemaining = totalTimeAllotted;
+				mcSubmitScore.visible = false;
+			}
+			else
+			{
+				if(gameTimer)
+				{
+					gameTimer.removeEventListener(TimerEvent.TIMER,gameTimerListener);
+				}
+				mcSubmitScore.visible = true;
+				mcSubmitScore.addEventListener(MouseEvent.CLICK,submitscoreclickListener);
+				
+				
+			}
 			trace('kongregate:'+kongregate);
-			timeElapsed = 0;
+			
 			gameScore = 0;
 			gameusedTilesArray = new Array();
-			gameTimer = new Timer(1000,60);
-			gameTimer.removeEventListener(TimerEvent.TIMER,gameTimerListener);
-			gameTimer.addEventListener(TimerEvent.TIMER,gameTimerListener);
-			gameTimer.start();
-			timeRemaining = totalTimeAllotted;
+			
 			selectedTilesArray = new Array();
 			var settings:TileSettings = new TileSettings();
 			myDictionary = new MyDictionary();
@@ -69,7 +97,7 @@
 					
 				}
 			}
-			mcFoundWords["wordsCounter"] = 0;
+			correctWords=0;
 			mcEnterWord.addEventListener(MouseEvent.CLICK,wordEnteredListener);
 			mcCancelWord.addEventListener(MouseEvent.CLICK,wordCancelledListener);
 		}
@@ -85,6 +113,11 @@
 			}
 			gameScore += wordscore;			
 			txtScore.text = ""+gameScore;
+			var wordlength:int = foundWord.length;
+			if(wordlength >= 4)
+			{
+				kongregate.stats.submit( "lengthy-word", wordlength )
+			}
 			
 		}
 		function gameTimerListener(evt:TimerEvent)
@@ -111,6 +144,9 @@
 		}
 		function unloadScene()
 		{
+			gameTimer.removeEventListener(TimerEvent.TIMER,gameTimerListener);
+			mcEnterWord.removeEventListener(MouseEvent.CLICK,wordEnteredListener);
+			mcCancelWord.removeEventListener(MouseEvent.CLICK,wordCancelledListener);
 			for(var i:int = 0; i < gameusedTilesArray.length; i++)
 			{
 				var tile = gameusedTilesArray[i];
@@ -140,7 +176,6 @@
 		
 		public function wordEnteredListener(evt:MouseEvent)
 		{
-			var foundWord:String="";
 			
 			for(var i:int = 0; i < selectedTilesArray.length;i++)
 			{
@@ -151,67 +186,59 @@
 			{
 				return;
 			}
-			var mcFoundWord:FoundWord = new FoundWord();
+			mcFoundWord = new FoundWord();
+			this.addChild(mcFoundWord);
 			
-			mcFoundWords.addChild(mcFoundWord);
+			
 			mcFoundWord["txtFoundWord"].text = foundWord;
-			mcFoundWord.x = 10;
-			mcFoundWord.y = mcFoundWord.height * mcFoundWords["wordsCounter"] + 5 *  mcFoundWords["wordsCounter"];
-			mcFoundWord.name = "mcFoundWord"+mcFoundWords["wordsCounter"];
+			mcFoundWord.x = 680;
+			mcFoundWord.y = 200;
+			mcFoundWord.name = "mcFoundWord"+correctWords;
 			//mcFoundWord.validate();
 			if(myDictionary.isValid(foundWord)==true)
 			{
-				trace('word is valid');
-				var tick:mcCorrect = new mcCorrect();
-				mcFoundWords.addChild(tick);
-				tick.x = 150
-				tick.y = mcFoundWord.y;
-				mcFoundWord["tick"] = tick;;
+				
 				var isWordRepeated:Boolean = false;
-				for(var c:int = 0; c < mcFoundWords["wordsCounter"]; c++)
-				{
-					var checkWord:MovieClip = mcFoundWords.getChildByName("mcFoundWord"+c) as MovieClip;
-					if(!checkWord)//word is not previously present in list, so calculate score
+				for(var c:int = 0; c <correctWords; c++)
+				{					
+					var isWordAlreadyInList:int = addedWords.indexOf(foundWord);
+					if(isWordAlreadyInList != -1)//word already used.
 					{
 						
-						continue;
-					}
-					var wordInList:String = checkWord["txtFoundWord"].text ;
-					if(foundWord == wordInList)
-					{
-						wrongTimer = new Timer(1000,0);
-						wrongTimer.removeEventListener(TimerEvent.TIMER,wrongTimerListener);
-						wrongTimer.addEventListener(TimerEvent.TIMER,wrongTimerListener);
-						wrongTimer.start();
-						currentWrong = mcFoundWord["tick"];
-						currentFoundWord = mcFoundWord;
+						Tweener.addTween(mcFoundWord,{x:-25,y:-250,scaleX :0.4,scaleY: 0.4,alpha : 0,time:3,transition:"linear",onComplete:wordTravelledOutofScreen});
 						trace('started wrong timer');
-						mcFoundWords["wordsCounter"] -= 1;
+						correctWords -= 1;
 						isWordRepeated = true;
+						
 					}
+					
 				}
 				if(isWordRepeated == false)
 				{
+					addedWords.push(foundWord);
+					Tweener.addTween(mcFoundWord,{x:txtScore.x,y:txtScore.y,scaleX :0.4,scaleY: 0.4,alpha : 0,time:1,transition:"linear",onComplete:wordTravelledTillScoreTextbox});
 					trace('word is input for the first time, calculating score');
-					calculateScore(foundWord);
+					foundWordsAndTicksArray.push(mcFoundWord);
 				}
 				
 			}
 			else
 			{
 				trace('word is invalid');
-				var wrong:mcWrong = new mcWrong();
-				mcFoundWords.addChild(wrong);
-				wrong.x = 150;
-				wrong.y = mcFoundWord.y;
-				wrongTimer = new Timer(1000,0);
-				wrongTimer.removeEventListener(TimerEvent.TIMER,wrongTimerListener);
-				wrongTimer.addEventListener(TimerEvent.TIMER,wrongTimerListener);
-				wrongTimer.start();
-				currentWrong = wrong;
-				currentFoundWord = mcFoundWord;
-				trace('started wrong timer');
-				mcFoundWords["wordsCounter"] -= 1;
+				Tweener.addTween(mcFoundWord,{time:1.8,alpha:0.05,transition:"linear",onComplete:wordTravelledOutofScreen});
+				wrong = new mcWrong();
+				this.addChild(wrong);
+				mcFoundWord.scaleX *= 3;
+				mcFoundWord.scaleY *= 3;
+				mcFoundWord.x -= 100;
+				Tweener.addTween(wrong,{alpha:0.05,time:1.8,transition:"linear"});
+				wrong.scaleX *= 3;
+				wrong.scaleY *= 3;
+				wrong.x = mcFoundWord.x + foundWord.length * 15;
+				wrong.y = mcFoundWord.y + 10;
+				
+				
+				correctWords -= 1;
 			}
 			for(var c:int = 0; c < selectedTilesArray.length;c++)
 			{
@@ -221,11 +248,49 @@
 			selectedTilesArray.splice(0);
 			currentI = -1;
 			currentJ = -1;
-			mcFoundWords["wordsCounter"] += 1;		
+			correctWords += 1;
+			var totalWordsNow:int = correctWords;
+			
+			if( totalWordsNow >= 3 )
+			{
+				for(var i:int = 0; i < foundWordsAndTicksArray.length;i++)
+				{
+					var mc = foundWordsAndTicksArray[i] as MovieClip;
+					if(mc)
+					{
+						mc.parent.removeChild(mc);
+					}
+				}
+				correctWords=0;
+				
+			}
 		}
+		function wordTravelledOutofScreen()
+		{
+			if(mcFoundWord)
+			{
+				mcFoundWord.parent.removeChild(mcFoundWord);
+				mcFoundWord = null;
+			}
+			foundWord="";
+			wrong.parent.removeChild(wrong);
+		}
+		function wordTravelledTillScoreTextbox()
+		{
+			trace('travel complete');
+			if(mcFoundWord)
+			{
+				mcFoundWord.parent.removeChild(mcFoundWord);
+				mcFoundWord = null;
+			}
+			
+			calculateScore(foundWord);
+			foundWord="";
+		}
+		
 		function wrongTimerListener(evt:TimerEvent)
 		{
-			trace(' wrong timer completed, starting alpha zeroing');
+			
 			Tweener.addTween(currentWrong,{alpha:0,time:0.5,transition:"linear"});
 			Tweener.addTween(currentFoundWord,{alpha:0,time:0.5,transition:"linear"});
 			
